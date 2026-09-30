@@ -95,17 +95,17 @@ fn main() {
         .unwrap();
 
 
-    let mut disk_names : Vec<String> = Vec::new();
-    let mut array_data: ArrayState;
+    //let mut disk_names : Vec<String> = Vec::new();
+    let array_data: ArrayState;
     let mut disk_collection: Vec<Disk> = Vec::new();
 
-    println!("Finding disks...");
-    disk_names = name_scanner(&emhttp);
+    //println!("Finding disks...");
+    //disk_names = name_scanner(&emhttp);
 
     println!("Disk list populated.\nScanning array...");
 
     array_data = array_scanner(&var_file);
-    println!("{:#?}", &array_data);
+    println!("{:#?}", array_data);
     println!("Gathering basic disk info...");
     disk_collection = process_disks(&emhttp);
     
@@ -114,16 +114,16 @@ fn main() {
 
     println!("Gathering SMART disk info...");
     for disk in &mut disk_collection {
-        let mut disk_device = &disk.device;
-        let mut smart_hdd: SmartDataHDD;
-        let mut smart_ssd: SmartDataSSD;
+        let disk_device = &disk.device;
+        let smart_hdd: SmartDataHDD;
+        let smart_ssd: SmartDataSSD;
         if disk_device.contains("nvme") {
-            smart_ssd = scrape_ssd(&disk_device);
+            smart_ssd = scrape_ssd(disk_device);
             disk.smartssd = Some(smart_ssd);
             println!("SSD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smartssd);
         } else {
-            smart_hdd = scrape_hdd(&disk_device);
+            smart_hdd = scrape_hdd(disk_device);
             disk.smarthdd = Some(smart_hdd);
             println!("HDD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smarthdd);
@@ -260,7 +260,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 
         // Boundary check happens FIRST, independent of the "=" check
         if trimmed.starts_with("[") {
-            if has_data && d_device != "" {
+            if has_data && !d_device.is_empty() {
                 disk_info.push(Disk {
                     name: d_name.clone(),
                     device: d_device.clone(),
@@ -312,7 +312,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
     }
 
     // the last disk in the file never hits another "[" header, so push it here
-    if has_data && d_device != ""{
+    if has_data && !d_device.is_empty() {
         disk_info.push(Disk {
             name: d_name,
             device: d_device,
@@ -344,7 +344,7 @@ fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
             let parts: Vec<&str> = trimmed.split("=").collect();
             if parts.len() >= 2 && parts[0].trim() == "device" {
                 let device_name = parts[1].trim_matches('"').to_string();
-                if device_name == "" {
+                if device_name.is_empty() {
                     continue; // skip empty device names
                 } else {
                     disk_names.push(device_name);
