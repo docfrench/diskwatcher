@@ -1,6 +1,6 @@
 use std::{process::Command};
 
-
+#[allow(dead_code)]
 #[derive(Debug)]
 struct Disk {
     name: String,        // 
@@ -15,7 +15,7 @@ struct Disk {
     smarthdd: Option<SmartDataHDD>,
     smartssd: Option<SmartDataSSD>,
 }
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct ArrayState {
     md_state: String, //"STARTED"
@@ -32,7 +32,7 @@ struct ArrayState {
 }
 
 
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SmartDataHDD {
     raw_read_error_rate: Option<i32>,
@@ -55,7 +55,7 @@ struct SmartDataHDD {
     udma_crc_error_count: Option<i32>,
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SmartDataSSD {
     critical_warning: Option<i64>,
@@ -95,10 +95,6 @@ fn main() {
         .unwrap();
 
 
-    //let mut disk_names : Vec<String> = Vec::new();
-
-    //println!("Finding disks...");
-    //disk_names = name_scanner(&emhttp);
 
     println!("Disk list populated.\nScanning array...");
 
@@ -107,8 +103,6 @@ fn main() {
     println!("Gathering basic disk info...");
     let mut disk_collection = process_disks(&emhttp);
     
-
-    //println!("{:#?}", disk_names);
 
     println!("Gathering SMART disk info...");
     for disk in &mut disk_collection {
