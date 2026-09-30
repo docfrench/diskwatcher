@@ -1,6 +1,6 @@
 use std::{process::Command};
 
-
+#[allow(dead_code)]
 #[derive(Debug)]
 struct Disk {
     name: String,        // 
@@ -15,7 +15,7 @@ struct Disk {
     smarthdd: Option<SmartDataHDD>,
     smartssd: Option<SmartDataSSD>,
 }
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct ArrayState {
     md_state: String, //"STARTED"
@@ -32,7 +32,7 @@ struct ArrayState {
 }
 
 
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SmartDataHDD {
     raw_read_error_rate: Option<i32>,
@@ -55,7 +55,7 @@ struct SmartDataHDD {
     udma_crc_error_count: Option<i32>,
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 struct SmartDataSSD {
     critical_warning: Option<i64>,
@@ -95,35 +95,27 @@ fn main() {
         .unwrap();
 
 
-    let mut disk_names : Vec<String> = Vec::new();
-    let mut array_data: ArrayState;
-    let mut disk_collection: Vec<Disk> = Vec::new();
-
-    println!("Finding disks...");
-    disk_names = name_scanner(&emhttp);
 
     println!("Disk list populated.\nScanning array...");
 
-    array_data = array_scanner(&var_file);
-    println!("{:#?}", &array_data);
+    let array_data: ArrayState = array_scanner(&var_file);
+    println!("{:#?}", array_data);
     println!("Gathering basic disk info...");
-    disk_collection = process_disks(&emhttp);
+    let mut disk_collection = process_disks(&emhttp);
     
-
-    //println!("{:#?}", disk_names);
 
     println!("Gathering SMART disk info...");
     for disk in &mut disk_collection {
-        let mut disk_device = &disk.device;
-        let mut smart_hdd: SmartDataHDD;
-        let mut smart_ssd: SmartDataSSD;
+        let disk_device = &disk.device;
+        let smart_hdd: SmartDataHDD;
+        let smart_ssd: SmartDataSSD;
         if disk_device.contains("nvme") {
-            smart_ssd = scrape_ssd(&disk_device);
+            smart_ssd = scrape_ssd(disk_device);
             disk.smartssd = Some(smart_ssd);
             println!("SSD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smartssd);
         } else {
-            smart_hdd = scrape_hdd(&disk_device);
+            smart_hdd = scrape_hdd(disk_device);
             disk.smarthdd = Some(smart_hdd);
             println!("HDD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smarthdd);
@@ -131,7 +123,7 @@ fn main() {
         
     }
 
-    println!("{:#?}", &disk_collection);
+    println!("{:#?}", disk_collection);
 }
 
 fn scrape_hdd(device: &str) -> SmartDataHDD {
@@ -148,7 +140,7 @@ fn scrape_hdd(device: &str) -> SmartDataHDD {
 
     let str_output = String::from_utf8_lossy(&raw_output.stdout);
     for line in str_output.lines() {
-        let parts: Vec<&str> = line.trim().split_whitespace().collect();
+        let parts: Vec<&str> = line.split_whitespace().collect();
 
         if parts.len() < 10 {
             continue;
@@ -260,7 +252,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 
         // Boundary check happens FIRST, independent of the "=" check
         if trimmed.starts_with("[") {
-            if has_data && d_device != "" {
+            if has_data && !d_device.is_empty() {
                 disk_info.push(Disk {
                     name: d_name.clone(),
                     device: d_device.clone(),
@@ -312,7 +304,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
     }
 
     // the last disk in the file never hits another "[" header, so push it here
-    if has_data && d_device != ""{
+    if has_data && !d_device.is_empty() {
         disk_info.push(Disk {
             name: d_name,
             device: d_device,
@@ -330,7 +322,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 
     disk_info
 }
-
+/*
 fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
     let str_output = String::from_utf8_lossy(&emhttp.stdout);
     let mut disk_names: Vec<String> = Vec::new();
@@ -344,7 +336,7 @@ fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
             let parts: Vec<&str> = trimmed.split("=").collect();
             if parts.len() >= 2 && parts[0].trim() == "device" {
                 let device_name = parts[1].trim_matches('"').to_string();
-                if device_name == "" {
+                if device_name.is_empty() {
                     continue; // skip empty device names
                 } else {
                     disk_names.push(device_name);
@@ -354,7 +346,7 @@ fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
     }
 
     disk_names
-}
+}*/
 
 fn array_scanner(var_file: &std::process::Output) -> ArrayState {
     let str_output = String::from_utf8_lossy(&var_file.stdout);
