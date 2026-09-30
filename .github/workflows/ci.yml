@@ -63,10 +63,13 @@ jobs:
         run: |
           docker run -d \
             --name diskwatcher \
+            --privileged \
             --network br0 \
             --ip 192.168.0.8 \
             -e TZ=America/New_York \
             -v /etc/localtime:/etc/localtime:ro \
+            -v /dev:/dev 
+            -v /var/local/emhttp:/var/local/emhttp:ro
             ghcr.io/${{ github.repository_owner }}/diskwatcher:${{ github.sha }}
 
 

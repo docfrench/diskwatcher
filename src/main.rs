@@ -322,31 +322,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 
     disk_info
 }
-/*
-fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
-    let str_output = String::from_utf8_lossy(&emhttp.stdout);
-    let mut disk_names: Vec<String> = Vec::new();
 
-    for line in str_output.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("[") {
-            continue; // skip header lines
-        }
-        if trimmed.contains("=") {
-            let parts: Vec<&str> = trimmed.split("=").collect();
-            if parts.len() >= 2 && parts[0].trim() == "device" {
-                let device_name = parts[1].trim_matches('"').to_string();
-                if device_name.is_empty() {
-                    continue; // skip empty device names
-                } else {
-                    disk_names.push(device_name);
-                }
-            }
-        }
-    }
-
-    disk_names
-}*/
 
 fn array_scanner(var_file: &std::process::Output) -> ArrayState {
     let str_output = String::from_utf8_lossy(&var_file.stdout);
