@@ -96,18 +96,16 @@ fn main() {
 
 
     //let mut disk_names : Vec<String> = Vec::new();
-    let array_data: ArrayState;
-    let mut disk_collection: Vec<Disk> = Vec::new();
 
     //println!("Finding disks...");
     //disk_names = name_scanner(&emhttp);
 
     println!("Disk list populated.\nScanning array...");
 
-    array_data = array_scanner(&var_file);
+    let array_data: ArrayState = array_scanner(&var_file);
     println!("{:#?}", array_data);
     println!("Gathering basic disk info...");
-    disk_collection = process_disks(&emhttp);
+    let disk_collection = process_disks(&emhttp);
     
 
     //println!("{:#?}", disk_names);
@@ -131,7 +129,7 @@ fn main() {
         
     }
 
-    println!("{:#?}", &disk_collection);
+    println!("{:#?}", disk_collection);
 }
 
 fn scrape_hdd(device: &str) -> SmartDataHDD {
@@ -148,7 +146,7 @@ fn scrape_hdd(device: &str) -> SmartDataHDD {
 
     let str_output = String::from_utf8_lossy(&raw_output.stdout);
     for line in str_output.lines() {
-        let parts: Vec<&str> = line.trim().split_whitespace().collect();
+        let parts: Vec<&str> = line.split_whitespace().trim().collect();
 
         if parts.len() < 10 {
             continue;
@@ -330,7 +328,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 
     disk_info
 }
-
+/*
 fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
     let str_output = String::from_utf8_lossy(&emhttp.stdout);
     let mut disk_names: Vec<String> = Vec::new();
@@ -354,7 +352,7 @@ fn name_scanner(emhttp: &std::process::Output) -> Vec<String> {
     }
 
     disk_names
-}
+}*/
 
 fn array_scanner(var_file: &std::process::Output) -> ArrayState {
     let str_output = String::from_utf8_lossy(&var_file.stdout);
