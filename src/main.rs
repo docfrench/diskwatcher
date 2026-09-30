@@ -105,7 +105,7 @@ fn main() {
     let array_data: ArrayState = array_scanner(&var_file);
     println!("{:#?}", array_data);
     println!("Gathering basic disk info...");
-    let disk_collection = process_disks(&emhttp);
+    let mut disk_collection = process_disks(&emhttp);
     
 
     //println!("{:#?}", disk_names);
@@ -146,7 +146,7 @@ fn scrape_hdd(device: &str) -> SmartDataHDD {
 
     let str_output = String::from_utf8_lossy(&raw_output.stdout);
     for line in str_output.lines() {
-        let parts: Vec<&str> = line.split_whitespace().trim().collect();
+        let parts: Vec<&str> = line.split_whitespace().collect();
 
         if parts.len() < 10 {
             continue;
