@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Pull latest image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/dice_roller:${{ github.sha }}
+        run: docker pull ghcr.io/${{ github.repository_owner }}/diskwatcher:${{ github.sha }}
 
       - name: Stop and remove old container
         run: docker rm -f diskwatcher || true
@@ -67,6 +67,6 @@ jobs:
             --ip 192.168.0.8 \
             -e TZ=America/New_York \
             -v /etc/localtime:/etc/localtime:ro \
-            ghcr.io/${{ github.repository_owner }}/dice_roller:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/diskwatcher:${{ github.sha }}
 
 
