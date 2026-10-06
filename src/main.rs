@@ -131,7 +131,7 @@ fn scan_sweep() {
 
     println!("{}", formatted_array);
 
-    //println!("{:#?}", disk_collection);
+
 }
 
 fn main() {
