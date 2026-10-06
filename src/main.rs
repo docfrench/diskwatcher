@@ -7,7 +7,7 @@ struct Disk {
     device: String,      // "sdg" used as lookup; label
     disk_type: String,   // "Parity" becomes a label
     status: String,      // "DISK_OK" could be a label, or converted to a 1.0/0.0 metric
-    temp: i32,           
+    temp: Option<i32>,           
     num_errors: i32,     
     num_reads: i64,
     num_writes: i64,
@@ -128,7 +128,7 @@ fn scan_sweep() {
     }
 
     let formatted_array = format_array(&array_data);
-    println!("{:#?}", formatted_array);
+    println!("{}", formatted_array);
 
     //println!("{:#?}", disk_collection);
 }
@@ -199,7 +199,7 @@ fn format_disk(disk: &Disk) -> String {
 
     let mut out = String::new();
 
-    push_metric(&mut out, "disk_temperature_celsius", &labels, Some(disk.temp));
+    push_metric(&mut out, "disk_temperature_celsius", &labels, disk.temp);
     push_metric(&mut out, "disk_errors_total", &labels, Some(disk.num_errors));
     push_metric(&mut out, "disk_reads_total", &labels, Some(disk.num_reads));
     push_metric(&mut out, "disk_writes_total", &labels, Some(disk.num_writes));
@@ -323,7 +323,7 @@ fn scrape_ssd(device: &str) -> SmartDataSSD {
         let value_with_unit = value_parts[0];
 
         match label {
-                    "Critical Warning" => smart.critical_warning = value_with_unit.parse::<i64>().ok(),
+                    "Critical Warning" => smart.critical_warning = i64::from_str_radix(value_with_unit.trim_start_matches("0x"), 16).ok(),
                     "Temperature" => smart.temperature = value_with_unit.parse::<i32>().ok(),
                     "Available Spare" => smart.available_spare = value_with_unit.parse::<i32>().ok(),
                     "Available Spare Threshold" => smart.available_spare_thresh = value_with_unit.parse::<i32>().ok(),
@@ -338,7 +338,7 @@ fn scrape_ssd(device: &str) -> SmartDataSSD {
                     "Unsafe Shutdowns" => smart.unsafe_shutdowns = value_with_unit.parse::<i32>().ok(),
                     "Media and Data Integrity Errors" => smart.media_data_int = value_with_unit.parse::<i32>().ok(),
                     "Error Information Log Entries" => smart.error_inf_log = value_with_unit.parse::<i32>().ok(),
-                    "Warning Comp. Temperature Time" => smart.warning_comp_tt = value_with_unit.parse::<i32>().ok(),
+                    "Warning  Comp. Temperature Time" => smart.warning_comp_tt = value_with_unit.parse::<i32>().ok(),
                     "Critical Comp. Temperature Time" => smart.critical_comp_tt = value_with_unit.parse::<i32>().ok(),
                     "Temperature Sensor 1" => smart.temp_sen_1 = value_with_unit.parse::<i32>().ok(),
                     "Temperature Sensor 2" => smart.temp_sen_2 = value_with_unit.parse::<i32>().ok(),
@@ -358,7 +358,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
     let mut d_device = String::new();
     let mut d_type = String::new();
     let mut d_status = String::new();
-    let mut d_temp = 0;
+    let mut d_temp: Option<i32> = None;
     let mut d_num_errors = 0;
     let mut d_num_reads = 0;
     let mut d_num_writes = 0;
@@ -390,7 +390,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
             d_device.clear();
             d_type.clear();
             d_status.clear();
-            d_temp = 0;
+            d_temp = None;
             d_num_errors = 0;
             d_num_reads = 0;
             d_num_writes = 0;
@@ -409,7 +409,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
                     "device" => d_device = value.to_string(),
                     "type" => d_type = value.to_string(),
                     "status" => d_status = value.to_string(),
-                    "temp" => d_temp = value.parse().unwrap_or(0),
+                    "temp" => d_temp = value.parse().ok(),
                     "numErrors" => d_num_errors = value.parse().unwrap_or(0),
                     "numReads" => d_num_reads = value.parse().unwrap_or(0),
                     "numWrites" => d_num_writes = value.parse().unwrap_or(0),
