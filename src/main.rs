@@ -80,9 +80,8 @@ struct SmartDataSSD {
 }
 
 
-fn main() {
 
-
+fn scan_sweep() {
     let emhttp = Command::new("cat")
         .args(["/var/local/emhttp/disks.ini"])
         .output()
@@ -122,14 +121,38 @@ fn main() {
         }
         
     }
-
-    println!("{:#?}", disk_collection);
+    println!("Disk scan complete. Trying to format disk temperature metrics...");
+    for disk in &disk_collection {
+        let formatted_metric = format_disk(disk);
+        println!("{}", formatted_metric);
+    }
+    //println!("{:#?}", disk_collection);
 }
+
+fn main() {
+    loop {
+        scan_sweep();
+        println!("Scan complete. Sleeping for 60 seconds...");
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+
+    
+}
+
+
+fn format_disk(disk: &Disk) -> String {
+    format!(
+        "disk_temperature_celsius{{device=\"{}\",disk_type=\"{}\"}} {}\n",
+        disk.device, disk.disk_type, disk.temp
+    )
+}
+
+
 
 fn scrape_hdd(device: &str) -> SmartDataHDD {
     let device_path = format!("/dev/{}", device);
     let raw_output = Command::new("smartctl")
-        .args(["-A", &device_path])
+        .args(["-n", "standby", "-A", &device_path])
         .output()
         .unwrap();
 
