@@ -9,9 +9,9 @@ struct Disk {
     status: String,      // "DISK_OK" could be a label, or converted to a 1.0/0.0 metric
     temp: i32,           
     num_errors: i32,     
-    num_reads: i32,
-    num_writes: i32,
-    size: i32,           
+    num_reads: i64,
+    num_writes: i64,
+    size: i64,           
     smarthdd: Option<SmartDataHDD>,
     smartssd: Option<SmartDataSSD>,
 }
@@ -63,10 +63,10 @@ struct SmartDataSSD {
     available_spare: Option<i32>,
     available_spare_thresh: Option<i32>,
     percentage_used: Option<i32>,
-    data_units_read: Option<i32>,
-    data_units_written: Option<i32>,
-    host_read_commands: Option<i32>,
-    host_write_commands: Option<i32>,
+    data_units_read: Option<i64>,
+    data_units_written: Option<i64>,
+    host_read_commands: Option<i64>,
+    host_write_commands: Option<i64>,
     controller_busy_time: Option<i32>,
     power_cycles: Option<i32>,
     power_on_hours: Option<i32>,
@@ -126,6 +126,10 @@ fn scan_sweep() {
         let formatted_metric = format_disk(disk);
         println!("{}", formatted_metric);
     }
+
+    let formatted_array = format_array(&array_data);
+    println!("{:#?}", formatted_array);
+
     //println!("{:#?}", disk_collection);
 }
 
@@ -135,19 +139,115 @@ fn main() {
         println!("Scan complete. Sleeping for 60 seconds...");
         std::thread::sleep(std::time::Duration::from_secs(60));
     }
-
     
 }
 
 
-fn format_disk(disk: &Disk) -> String {
-    format!(
-        "disk_temperature_celsius{{device=\"{}\",disk_type=\"{}\"}} {}\n",
-        disk.device, disk.disk_type, disk.temp
-    )
+fn push_metric<T: std::fmt::Display>(out: &mut String, name: &str, labels: &str, value: Option<T>) {
+    if let Some(v) = value {
+        if labels.is_empty() {
+            out.push_str(&format!("{} {}\n", name, v));
+        } else {
+            out.push_str(&format!("{}{{{}}} {}\n", name, labels, v));
+        }
+    }
 }
 
 
+
+
+fn format_array(array_data: &ArrayState) -> String {
+    let mut out = String::new();
+    let none = "";
+
+    let started = if array_data.md_state == "STARTED" { 1 } else { 0 };
+    push_metric(&mut out, "array_started", none, Some(started));
+
+    // already Option<_>: pass straight through
+    push_metric(&mut out, "array_resync_position", none, array_data.md_resync_pos);
+    push_metric(&mut out, "array_resync_size", none, array_data.md_resync_size);
+    push_metric(&mut out, "array_resync_corrections", none, array_data.md_resync_corr);
+    push_metric(&mut out, "array_sync_errors", none, array_data.sb_sync_errs);
+
+    // plain values: wrap in Some
+    push_metric(&mut out, "array_disks", none, Some(array_data.md_num_disks));
+    push_metric(&mut out, "array_disks_disabled", none, Some(array_data.md_num_disabled));
+    push_metric(&mut out, "array_disks_invalid", none, Some(array_data.md_num_invalid));
+    push_metric(&mut out, "array_disks_missing", none, Some(array_data.md_num_missing));
+
+    // the strings ride along as labels on an info metric
+    let info = format!(
+        "md_state=\"{}\",fs_state=\"{}\",resync_action=\"{}\"",
+        array_data.md_state, array_data.fs_state, array_data.md_resync_action
+    );
+    push_metric(&mut out, "array_info", &info, Some(1));
+
+    out
+}
+
+
+
+
+fn format_disk(disk: &Disk) -> String {
+    //labels added to every disk data string
+    let labels = format!("device=\"{}\",disk_type=\"{}\"", disk.device, disk.disk_type);
+    
+    let ok = if disk.status == "DISK_OK" { 1 } else { 0 };
+    let hdd = disk.smarthdd.as_ref();
+    let ssd = disk.smartssd.as_ref();
+
+
+    let mut out = String::new();
+
+    push_metric(&mut out, "disk_temperature_celsius", &labels, Some(disk.temp));
+    push_metric(&mut out, "disk_errors_total", &labels, Some(disk.num_errors));
+    push_metric(&mut out, "disk_reads_total", &labels, Some(disk.num_reads));
+    push_metric(&mut out, "disk_writes_total", &labels, Some(disk.num_writes));
+    push_metric(&mut out, "disk_size_bytes", &labels, Some(disk.size * 1024));
+
+    //SmartHDD
+    push_metric(&mut out, "disk_smart_hdd_temperature_celsius", &labels, hdd.and_then(|s| s.temperature_celsius));
+    push_metric(&mut out, "disk_smart_hdd_reallocated_event_ct", &labels, hdd.and_then(|s| s.reallocated_event_count));
+    push_metric(&mut out, "disk_smart_hdd_current_pending_sector", &labels, hdd.and_then(|s| s.current_pending_sector));
+    push_metric(&mut out, "disk_smart_hdd_raw_read_error_rate", &labels, hdd.and_then(|s| s.raw_read_error_rate));
+    push_metric(&mut out, "disk_smart_hdd_throughput_performance", &labels, hdd.and_then(|s| s.throughput_performance));
+    push_metric(&mut out, "disk_smart_hdd_spin_up_time", &labels, hdd.and_then(|s| s.spin_up_time));
+    push_metric(&mut out, "disk_smart_hdd_start_stop_count", &labels, hdd.and_then(|s| s.start_stop_count));
+    push_metric(&mut out, "disk_smart_hdd_reallocated_sector_ct", &labels, hdd.and_then(|s| s.reallocated_sector_ct));
+    push_metric(&mut out, "disk_smart_hdd_seek_error_rate", &labels, hdd.and_then(|s| s.seek_error_rate));
+    push_metric(&mut out, "disk_smart_hdd_seek_time_performance", &labels, hdd.and_then(|s| s.seek_time_performance));
+    push_metric(&mut out, "disk_smart_hdd_power_on_hours", &labels, hdd.and_then(|s| s.power_on_hours));
+    push_metric(&mut out, "disk_smart_hdd_spin_retry_count", &labels, hdd.and_then(|s| s.spin_retry_count));
+    push_metric(&mut out, "disk_smart_hdd_power_cycle_count", &labels, hdd.and_then(|s| s.power_cycle_count));
+    push_metric(&mut out, "disk_smart_hdd_helium_level", &labels, hdd.and_then(|s| s.helium_level));
+    push_metric(&mut out, "disk_smart_hdd_power_off_retract_count", &labels, hdd.and_then(|s| s.power_off_retract_count));
+    push_metric(&mut out, "disk_smart_hdd_load_cycle_count", &labels, hdd.and_then(|s| s.load_cycle_count));
+    push_metric(&mut out, "disk_smart_hdd_offline_uncorrectable", &labels, hdd.and_then(|s| s.offline_uncorrectable));
+    push_metric(&mut out, "disk_smart_hdd_udma_crc_error_count", &labels, hdd.and_then(|s| s.udma_crc_error_count));
+    //SmartSSD
+    push_metric(&mut out, "disk_smart_ssd_critical_warning", &labels, ssd.and_then(|s| s.critical_warning));
+    push_metric(&mut out, "disk_smart_ssd_temperature", &labels, ssd.and_then(|s| s.temperature));
+    push_metric(&mut out, "disk_smart_ssd_available_spare", &labels, ssd.and_then(|s| s.available_spare));
+    push_metric(&mut out, "disk_smart_ssd_percentage_used", &labels, ssd.and_then(|s| s.percentage_used));
+    push_metric(&mut out, "disk_smart_ssd_data_units_read", &labels, ssd.and_then(|s| s.data_units_read));
+    push_metric(&mut out, "disk_smart_ssd_data_units_written", &labels, ssd.and_then(|s| s.data_units_written));
+    push_metric(&mut out, "disk_smart_ssd_host_read_commands", &labels, ssd.and_then(|s| s.host_read_commands));
+    push_metric(&mut out, "disk_smart_ssd_host_write_commands", &labels, ssd.and_then(|s| s.host_write_commands));
+    push_metric(&mut out, "disk_smart_ssd_controller_busy_time", &labels, ssd.and_then(|s| s.controller_busy_time));
+    push_metric(&mut out, "disk_smart_ssd_power_cycles", &labels, ssd.and_then(|s| s.power_cycles));
+    push_metric(&mut out, "disk_smart_ssd_available_spare_thresh", &labels, ssd.and_then(|s| s.available_spare_thresh));
+    push_metric(&mut out, "disk_smart_ssd_power_on_hours", &labels, ssd.and_then(|s| s.power_on_hours));
+    push_metric(&mut out, "disk_smart_ssd_unsafe_shutdowns", &labels, ssd.and_then(|s| s.unsafe_shutdowns));
+    push_metric(&mut out, "disk_smart_ssd_media_data_int", &labels, ssd.and_then(|s| s.media_data_int));
+    push_metric(&mut out, "disk_smart_ssd_error_inf_log", &labels, ssd.and_then(|s| s.error_inf_log));
+    push_metric(&mut out, "disk_smart_ssd_warning_comp_tt", &labels, ssd.and_then(|s| s.warning_comp_tt));
+    push_metric(&mut out, "disk_smart_ssd_critical_comp_tt", &labels, ssd.and_then(|s| s.critical_comp_tt));
+    push_metric(&mut out, "disk_smart_ssd_temp_sen_1", &labels, ssd.and_then(|s| s.temp_sen_1));
+    push_metric(&mut out, "disk_smart_ssd_temp_sen_2", &labels, ssd.and_then(|s| s.temp_sen_2));
+    //
+    push_metric(&mut out, "disk_ok", &labels, Some(ok));
+    out
+}
 
 fn scrape_hdd(device: &str) -> SmartDataHDD {
     let device_path = format!("/dev/{}", device);
@@ -155,8 +255,6 @@ fn scrape_hdd(device: &str) -> SmartDataHDD {
         .args(["-n", "standby", "-A", &device_path])
         .output()
         .unwrap();
-
-
 
     let mut smart = SmartDataHDD::default();
 
@@ -193,10 +291,7 @@ fn scrape_hdd(device: &str) -> SmartDataHDD {
                   
                     _ => {}
                 }
-
-
     }
-
     smart
 }
 
@@ -233,10 +328,10 @@ fn scrape_ssd(device: &str) -> SmartDataSSD {
                     "Available Spare" => smart.available_spare = value_with_unit.parse::<i32>().ok(),
                     "Available Spare Threshold" => smart.available_spare_thresh = value_with_unit.parse::<i32>().ok(),
                     "Percentage Used" => smart.percentage_used = value_with_unit.parse::<i32>().ok(),
-                    "Data Units Read" => smart.data_units_read = value_with_unit.parse::<i32>().ok(),
-                    "Data Units Written" => smart.data_units_written = value_with_unit.parse::<i32>().ok(),
-                    "Host Read Commands" => smart.host_read_commands = value_with_unit.parse::<i32>().ok(),
-                    "Host Write Commands" => smart.host_write_commands = value_with_unit.parse::<i32>().ok(),
+                    "Data Units Read" => smart.data_units_read = value_with_unit.parse::<i64>().ok(),
+                    "Data Units Written" => smart.data_units_written = value_with_unit.parse::<i64>().ok(),
+                    "Host Read Commands" => smart.host_read_commands = value_with_unit.parse::<i64>().ok(),
+                    "Host Write Commands" => smart.host_write_commands = value_with_unit.parse::<i64>().ok(),
                     "Controller Busy Time" => smart.controller_busy_time = value_with_unit.parse::<i32>().ok(),
                     "Power Cycles" => smart.power_cycles = value_with_unit.parse::<i32>().ok(),
                     "Power On Hours" => smart.power_on_hours = value_with_unit.parse::<i32>().ok(),
