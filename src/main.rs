@@ -128,6 +128,7 @@ fn scan_sweep() {
     }
 
     let formatted_array = format_array(&array_data);
+
     println!("{}", formatted_array);
 
     //println!("{:#?}", disk_collection);
