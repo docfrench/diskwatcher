@@ -126,8 +126,10 @@ fn scan_sweep() {
         let formatted_metric = format_disk(disk);
         println!("{}", formatted_metric);
     }
+
     let formatted_array = format_array(&array_data);
     println!("{:#?}", formatted_array);
+
     //println!("{:#?}", disk_collection);
 }
 
@@ -137,10 +139,8 @@ fn main() {
         println!("Scan complete. Sleeping for 60 seconds...");
         std::thread::sleep(std::time::Duration::from_secs(60));
     }
-
     
 }
-
 
 
 fn push_metric<T: std::fmt::Display>(out: &mut String, name: &str, labels: &str, value: Option<T>) {
@@ -248,8 +248,6 @@ fn format_disk(disk: &Disk) -> String {
     push_metric(&mut out, "disk_ok", &labels, Some(ok));
     out
 }
-
-
 
 fn scrape_hdd(device: &str) -> SmartDataHDD {
     let device_path = format!("/dev/{}", device);
