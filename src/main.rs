@@ -1,4 +1,14 @@
 use std::{process::Command};
+use std::fs;
+
+use std::{
+    io::{BufReader, prelude::*},
+    net::{TcpListener, TcpStream},
+};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -81,17 +91,10 @@ struct SmartDataSSD {
 
 
 
-fn scan_sweep() {
-    let emhttp = Command::new("cat")
-        .args(["/var/local/emhttp/disks.ini"])
-        .output()
-        .unwrap();
+fn scan_sweep() -> Result<String, std::io::Error> {
+    let emhttp = fs::read_to_string("/var/local/emhttp/disks.ini")?;
 
-
-    let var_file = Command::new("cat")
-        .args(["/var/local/emhttp/var.ini"])
-        .output()
-        .unwrap();
+    let var_file = fs::read_to_string("/var/local/emhttp/var.ini")?;
 
 
 
@@ -111,36 +114,68 @@ fn scan_sweep() {
         if disk_device.contains("nvme") {
             smart_ssd = scrape_ssd(disk_device);
             disk.smartssd = Some(smart_ssd);
-            println!("SSD: {} completed", disk_device);
+            //println!("SSD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smartssd);
         } else {
             smart_hdd = scrape_hdd(disk_device);
             disk.smarthdd = Some(smart_hdd);
-            println!("HDD: {} completed", disk_device);
+            //println!("HDD: {} completed", disk_device);
             //println!("smart: {:#?}", disk.smarthdd);
         }
         
     }
-    println!("Disk scan complete. Trying to format disk temperature metrics...");
+
+    let mut out = format_array(&array_data);
     for disk in &disk_collection {
-        let formatted_metric = format_disk(disk);
-        println!("{}", formatted_metric);
+        out.push_str(&format_disk(disk));
     }
-
-    let formatted_array = format_array(&array_data);
-
-    println!("{}", formatted_array);
-
-
+    Ok(out)
 }
 
-fn main() {
-    loop {
-        scan_sweep();
-        println!("Scan complete. Sleeping for 60 seconds...");
-        std::thread::sleep(std::time::Duration::from_secs(60));
+
+fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<String>>) {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+
+    let mut request_line = String::new();
+    if BufReader::new(&stream).read_line(&mut request_line).is_err() {
+        return;
     }
-    
+
+    let (status, content_type, body) = if request_line.starts_with("GET /metrics ") {
+        let body = metrics.lock().unwrap().clone();
+        ("200 OK", "text/plain; version=0.0.4; charset=utf-8", body)
+    } else {
+        ("404 Not Found", "text/plain", String::from("not found\n"))
+    };
+
+    let response = format!(
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        status, content_type, body.len(), body
+    );
+    let _ = stream.write_all(response.as_bytes());
+}
+
+
+
+fn main() {
+    let metrics = Arc::new(Mutex::new(String::new()));
+
+    let for_scanner = Arc::clone(&metrics);
+    thread::spawn(move || loop {
+        match scan_sweep() {
+            Ok(text) => *for_scanner.lock().unwrap() = text,
+            Err(e) => eprintln!("scan failed: {}", e),
+        }
+        thread::sleep(Duration::from_secs(60));
+    });
+
+    let listener = TcpListener::bind("0.0.0.0:9101").unwrap();
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => handle_connection(stream, &metrics),
+            Err(e) => eprintln!("connection failed: {}", e),
+        }
+    }
 }
 
 
@@ -351,8 +386,8 @@ fn scrape_ssd(device: &str) -> SmartDataSSD {
     smart
 }
 
-fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
-    let str_output = String::from_utf8_lossy(&emhttp.stdout);
+fn process_disks(emhttp: &str) -> Vec<Disk> {
+
     let mut disk_info: Vec<Disk> = Vec::new();
 
     let mut d_name = String::new();
@@ -366,7 +401,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
     let mut d_size = 0;
     let mut has_data = false; // tracks whether we've accumulated a real disk yet
 
-    for line in str_output.lines() {
+    for line in emhttp.lines() {
         let trimmed = line.trim();
 
         // Boundary check happens FIRST, independent of the "=" check
@@ -443,9 +478,7 @@ fn process_disks(emhttp: &std::process::Output) -> Vec<Disk> {
 }
 
 
-fn array_scanner(var_file: &std::process::Output) -> ArrayState {
-    let str_output = String::from_utf8_lossy(&var_file.stdout);
-
+fn array_scanner(var_file: &str) -> ArrayState {
 
     let mut md_state= String::new(); //"STARTED"
     let mut md_resync_action= String::new();
@@ -460,7 +493,7 @@ fn array_scanner(var_file: &std::process::Output) -> ArrayState {
     let mut fs_state= String::new();
 
 
-    for line in str_output.lines() {
+    for line in var_file.lines() {
         let trimmed = line.trim();
 
         if trimmed.contains("=") {
