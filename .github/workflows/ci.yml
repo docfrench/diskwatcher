@@ -66,7 +66,7 @@ jobs:
             --privileged \
             --network br0 \
             --ip 192.168.0.8 \
-            --p 9101:9101 
+            -p 9101:9101 
             -e TZ=America/New_York \
             -v /etc/localtime:/etc/localtime:ro \
             -v /dev:/dev \
