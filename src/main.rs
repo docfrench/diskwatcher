@@ -148,11 +148,14 @@ fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<String>>) {
         ("404 Not Found", "text/plain", String::from("not found\n"))
     };
 
+
     let response = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         status, content_type, body.len(), body
     );
     let _ = stream.write_all(response.as_bytes());
+
+
 }
 
 
